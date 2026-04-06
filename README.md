@@ -13,6 +13,7 @@ This utility forwards Nexus Mods `nxm://` links to Mod Organizer 2 within a Wine
     ```
 
 *   **Browser Integration: (Nexus Mods "Mod manager download")**
+    
     Create a `.desktop` file (e.g., `~/.local/share/applications/nxm-handler.desktop`) with the following content. Update the `Exec` path to point to your compiled binary.
 
     ```ini
