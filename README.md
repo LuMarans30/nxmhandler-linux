@@ -24,41 +24,39 @@ This utility forwards Nexus Mods `nxm://` links to Mod Organizer 2 within a Wine
     
     * Run `cargo run --release -- --create-desktop-file`
 
-    > [!NOTE]
-    > Next time you download a mod, the browser will prompt you to choose an application to manage nxm:// links. Choose "NXM Handler". Since then the browser will use the created .desktop entry, which automatically forwards the NXM URL to nxmhandler
-    
+> [!NOTE]
+> Next time you download a mod, the browser will prompt you to choose an application tomanage nxm:// links. Choose `NXM Handler`. Since then the browser will use the created desktop entry, which automatically forwards the NXM URL to nxmhandler
 
-    <details>
+<details>
 
-    <summary>If you want to do it manually</summary>
+<summary>If you want to do it manually</summary>
 
-    Create a `.desktop` file (e.g. `~/.local/share/applications/nxm-handler.desktop`) with the following content. Update the `Exec` path to point to your compiled binary.
-    After saving the file, run `update-desktop-database ~/.local/share/applications` to register the handler.
+Create a `.desktop` file (e.g. `~/.local/share/applications/nxm-handler.desktop`) with the following content. Update the `Exec` path to point to your compiled binary.
+After saving the file, run `update-desktop-database ~/.local/share/applications` to register the handler.
 
-    ```ini
-    [Desktop Entry]
-    Comment[en_US]=
-    Comment=
-    Exec=path-to-nxmhandler --nxm-url %u
-    GenericName[en_US]=
-    GenericName=
-    Icon=1204_ModOrganizer.0
-    MimeType=x-scheme-handler/nxm;
-    Name[en_US]=NXM Handler
-    Name=NXM Handler
-    Path=
-    StartupNotify=true
-    Terminal=false
-    Type=Application
-    X-KDE-SubstituteUID=false
-    X-KDE-Username=
-    ```
+```ini
+[Desktop Entry]
+Comment[en_US]=
+Comment=
+Exec=path-to-nxmhandler --nxm-url %u
+GenericName[en_US]=
+GenericName=
+Icon=1204_ModOrganizer.0
+MimeType=x-scheme-handler/nxm;
+Name[en_US]=NXM Handler
+Name=NXM Handler
+Path=
+StartupNotify=true
+Terminal=false
+Type=Application
+X-KDE-SubstituteUID=false
+X-KDE-Username=
+```
+</details>
 
-    </details>
-
-    > [!TIP]
-    > To verify the handler is registered, run:
-    > ```bash
-    > xdg-mime query default x-scheme-handler/nxm
-    > ```
-    > It should output `~/.local/share/applications/nxmhandler.desktop`
+> [!TIP]
+> To verify the handler is registered, run:
+> ```bash
+> xdg-mime query default x-scheme-handler/nxm
+> ```
+> It should output `~/.local/share/applications/nxmhandler.desktop`
