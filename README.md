@@ -17,30 +17,37 @@ This utility forwards Nexus Mods `nxm://` links to Mod Organizer 2 within a Wine
     *   `-w, --wineprefix <WINEPREFIX>`: Path to the Wine prefix. Prompts via file dialog if not set.
     *   `-a, --winearch <WINEARCH>`: Wine prefix architecture [default: win64] [possible values: win64, win32]
     *   `-m <MO2_PATH>`: MO2 path relative to the prefix's `drive_c` directory [default: `Modding/MO2`]
-    *   `-c, --create-desktop-file`: Create a .desktop entry to register the NXM protocol
+    *   `-c, --create-desktop-file`: Create a .desktop entry to register the NXM protocol *(mutually exclusive with other arguments)*
     *   `-h, --help`: Print help
 
 *   **Browser Integration (Nexus Mods "Mod manager download"):**
     
     * Run `cargo run --release -- --create-desktop-file`
-    **OR**
-    * Create a `.desktop` file (e.g. `~/.local/share/applications/nxm-handler.desktop`) with the following content. Update the `Exec` path to point to your compiled binary.
+    
+    <details>
+
+    <summary>If you want to do it manually</summary>
+
+    Create a `.desktop` file (e.g. `~/.local/share/applications/nxm-handler.desktop`) with the following content. Update the `Exec` path to point to your compiled binary.
     After saving the file, run `update-desktop-database ~/.local/share/applications` to register the handler.
-        ```ini
-        [Desktop Entry]
-        Comment[en_US]=
-        Comment=
-        Exec=path-to-nxmhandler --nxm-url %u
-        GenericName[en_US]=
-        GenericName=
-        Icon=1204_ModOrganizer.0
-        MimeType=x-scheme-handler/nxm;
-        Name[en_US]=NXM Handler
-        Name=NXM Handler
-        Path=
-        StartupNotify=true
-        Terminal=false
-        Type=Application
-        X-KDE-SubstituteUID=false
-        X-KDE-Username=
-        ```
+
+    ```ini
+    [Desktop Entry]
+    Comment[en_US]=
+    Comment=
+    Exec=path-to-nxmhandler --nxm-url %u
+    GenericName[en_US]=
+    GenericName=
+    Icon=1204_ModOrganizer.0
+    MimeType=x-scheme-handler/nxm;
+    Name[en_US]=NXM Handler
+    Name=NXM Handler
+    Path=
+    StartupNotify=true
+    Terminal=false
+    Type=Application
+    X-KDE-SubstituteUID=false
+    X-KDE-Username=
+    ```
+
+    </details>
