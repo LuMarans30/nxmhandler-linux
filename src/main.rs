@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use directories::{BaseDirs, ProjectDirs};
 use rfd::{FileDialog, MessageDialog};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -27,10 +28,7 @@ struct Cli {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let wineprefix = match cli.wineprefix {
-        Some(p) => p,
-        None => select_wineprefix()?,
-    };
+    let wineprefix = cli.wineprefix.map_or_else(select_wineprefix, Ok)?;
 
     if let Err(e) = save_last_path(&wineprefix) {
         eprintln!("Failed to save last used path: {}", e);
@@ -39,13 +37,16 @@ fn main() -> Result<()> {
     let mo2_dir = wineprefix.join("drive_c").join(&cli.mo2_path);
     let nxmhandler = mo2_dir.join("nxmhandler.exe");
 
-    if !mo2_dir.is_dir() {
-        anyhow::bail!("MO2 directory not found at {}", mo2_dir.display());
-    }
-
-    if !nxmhandler.is_file() {
-        anyhow::bail!("nxmhandler.exe not found at {}", nxmhandler.display());
-    }
+    anyhow::ensure!(
+        mo2_dir.is_dir(),
+        "MO2 directory not found at {}",
+        mo2_dir.display()
+    );
+    anyhow::ensure!(
+        nxmhandler.is_file(),
+        "nxmhandler.exe not found at {}",
+        nxmhandler.display()
+    );
 
     spawn_mo2(&wineprefix, &mo2_dir, &nxmhandler, &cli.nxm_url)?;
 
@@ -57,79 +58,79 @@ fn is_wineprefix(path: &Path) -> bool {
 }
 
 fn spawn_mo2(wineprefix: &Path, mo2_dir: &Path, nxmhandler: &Path, nxm_url: &str) -> Result<()> {
-    let mut cmd = Command::new("wine")
+    let status = Command::new("wine")
         .env("WINEARCH", "win64")
         .env("WINEPREFIX", wineprefix)
         .current_dir(mo2_dir)
         .arg(nxmhandler)
         .arg(nxm_url)
-        .spawn()
-        .context("Failed to launch wine")?;
+        .status()
+        .context("Failed to launch wine process")?;
 
-    let status = cmd.wait()?;
-    println!("Exit status: {:?}", status.code());
+    anyhow::ensure!(
+        status.success(),
+        "Wine exited with an error status: {}",
+        status
+    );
 
     Ok(())
 }
 
 fn select_wineprefix() -> Result<PathBuf> {
     let initial_dir = load_last_path().unwrap_or_else(|_| {
-        get_home_path()
-            .map(|p| p.join(".wine"))
-            .expect("HOME not set")
+        BaseDirs::new()
+            .map(|base| base.home_dir().join(".wine"))
+            .expect("Could not determine user home directory")
     });
 
     loop {
-        let folder = FileDialog::new().set_directory(&initial_dir).pick_folder();
-
-        match folder {
-            Some(path) => {
-                if is_wineprefix(&path) {
-                    return Ok(path);
-                }
-
-                MessageDialog::new()
-                    .set_title("Invalid Wine Prefix")
-                    .set_description(
-                        "The selected directory does not appear to be a valid Wine prefix",
-                    )
-                    .set_level(rfd::MessageLevel::Warning)
-                    .show();
+        if let Some(path) = FileDialog::new().set_directory(&initial_dir).pick_folder() {
+            if is_wineprefix(&path) {
+                return Ok(path);
             }
-            None => anyhow::bail!("No wineprefix selected"),
+
+            MessageDialog::new()
+                .set_title("Invalid Wine Prefix")
+                .set_description("The selected directory does not contain a valid 'drive_c' and 'dosdevices' structure.")
+                .set_level(rfd::MessageLevel::Warning)
+                .show();
+        } else {
+            anyhow::bail!("Wineprefix selection was cancelled by the user.");
         }
     }
 }
 
-fn get_config_path() -> Result<PathBuf> {
-    get_home_path().map(|p| p.join(".config/nxm-handler/last_prefix"))
+// XDG compliant config
+
+fn get_project_dirs() -> Result<ProjectDirs> {
+    ProjectDirs::from("", "", "nxm-handler")
+        .context("Could not determine valid configuration directories for your OS")
 }
 
 fn save_last_path(path: &Path) -> Result<()> {
-    let config_path = get_config_path()?;
-    if let Some(parent) = config_path.parent() {
-        fs::create_dir_all(parent).context("Failed to create config directory")?;
-    }
-    fs::write(&config_path, path.to_string_lossy().as_bytes())
-        .context("Failed to write config file")?;
+    let proj_dirs = get_project_dirs()?;
+    let config_dir = proj_dirs.config_dir();
+
+    fs::create_dir_all(config_dir).context("Failed to create configuration directory")?;
+
+    let config_file = config_dir.join("last_prefix");
+    fs::write(&config_file, path.to_string_lossy().as_bytes())
+        .context("Failed to write prefix path to configuration file")?;
+
     Ok(())
 }
 
 fn load_last_path() -> Result<PathBuf> {
-    let config_path = get_config_path()?;
-    if config_path.exists() {
-        let content = fs::read_to_string(config_path)?;
-        let path = PathBuf::from(content.trim());
-        if path.is_dir() {
-            return Ok(path);
-        }
-    }
+    let config_file = get_project_dirs()?.config_dir().join("last_prefix");
 
-    Err(anyhow::anyhow!("Could not find last_path"))
-}
+    let content = fs::read_to_string(config_file)
+        .context("No previous configuration found or file is unreadable")?;
 
-fn get_home_path() -> Result<PathBuf> {
-    std::env::var("HOME")
-        .context("HOME environment variable not set")
-        .map(PathBuf::from)
+    let path = PathBuf::from(content.trim());
+    anyhow::ensure!(
+        path.is_dir(),
+        "The previously saved prefix is no longer a valid directory"
+    );
+
+    Ok(path)
 }
