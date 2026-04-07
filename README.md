@@ -23,7 +23,11 @@ This utility forwards Nexus Mods `nxm://` links to Mod Organizer 2 within a Wine
 *   **Browser Integration (Nexus Mods "Mod manager download"):**
     
     * Run `cargo run --release -- --create-desktop-file`
+
+    > [!NOTE]
+    > Next time you download a mod, the browser will prompt you to choose an application to manage nxm:// links. Choose "NXM Handler". Since then the browser will use the created .desktop entry, which automatically forwards the NXM URL to nxmhandler
     
+
     <details>
 
     <summary>If you want to do it manually</summary>
@@ -51,3 +55,10 @@ This utility forwards Nexus Mods `nxm://` links to Mod Organizer 2 within a Wine
     ```
 
     </details>
+
+    > [!TIP]
+    > To verify the handler is registered, run:
+    > ```bash
+    > xdg-mime query default x-scheme-handler/nxm
+    > ```
+    > It should output `~/.local/share/applications/nxmhandler.desktop`
