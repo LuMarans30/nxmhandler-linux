@@ -1,10 +1,33 @@
 use anyhow::{Context, Result};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use directories::{BaseDirs, ProjectDirs};
 use rfd::{FileDialog, MessageDialog};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+#[derive(ValueEnum, Debug, Clone, PartialEq, Default)]
+#[clap(rename_all = "kebab_case")]
+enum WineArch {
+    #[default]
+    Win64,
+    Win32,
+}
+
+impl WineArch {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Win64 => "win64",
+            Self::Win32 => "win32",
+        }
+    }
+}
+
+impl std::fmt::Display for WineArch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
 
 #[derive(Parser)]
 #[command(
@@ -19,6 +42,10 @@ struct Cli {
     /// Path to wineprefix (prompts if not provided)
     #[arg(short, long)]
     wineprefix: Option<PathBuf>,
+
+    /// Wine prefix architecture
+    #[arg(short = 'a', long, default_value_t = WineArch::Win64)]
+    winearch: WineArch,
 
     /// MO2 path relative to wineprefix's drive_c
     #[arg(short, long, default_value = "Modding/MO2")]
@@ -48,7 +75,13 @@ fn main() -> Result<()> {
         nxmhandler.display()
     );
 
-    spawn_mo2(&wineprefix, &mo2_dir, &nxmhandler, &cli.nxm_url)?;
+    spawn_mo2(
+        &wineprefix,
+        &mo2_dir,
+        &nxmhandler,
+        &cli.nxm_url,
+        cli.winearch,
+    )?;
 
     Ok(())
 }
@@ -57,9 +90,15 @@ fn is_wineprefix(path: &Path) -> bool {
     path.join("drive_c").is_dir() && path.join("dosdevices").is_dir()
 }
 
-fn spawn_mo2(wineprefix: &Path, mo2_dir: &Path, nxmhandler: &Path, nxm_url: &str) -> Result<()> {
+fn spawn_mo2(
+    wineprefix: &Path,
+    mo2_dir: &Path,
+    nxmhandler: &Path,
+    nxm_url: &str,
+    winearch: WineArch,
+) -> Result<()> {
     let status = Command::new("wine")
-        .env("WINEARCH", "win64")
+        .env("WINEARCH", winearch.to_string())
         .env("WINEPREFIX", wineprefix)
         .current_dir(mo2_dir)
         .arg(nxmhandler)

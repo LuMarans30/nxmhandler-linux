@@ -15,7 +15,9 @@ This utility forwards Nexus Mods `nxm://` links to Mod Organizer 2 within a Wine
 *   **Arguments:**
     *   `-n, --nxm-url <NXM_URL>`: The NXM URL to handle (required).
     *   `-w, --wineprefix <WINEPREFIX>`: Path to the Wine prefix. Prompts via file dialog if not set.
+    *   `-a, --winearch <WINEARCH>`: Wine prefix architecture [default: win64] [possible values: win64, win32]
     *   `-m <MO2_PATH>`: MO2 path relative to the prefix's `drive_c` directory [default: `Modding/MO2`]
+    *   `-h, --help`: Print help
 
 *   **Browser Integration: (Nexus Mods "Mod manager download")**
     
