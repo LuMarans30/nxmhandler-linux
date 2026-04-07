@@ -155,7 +155,12 @@ fn save_last_path(path: &Path) -> Result<()> {
     let proj_dirs = get_project_dirs()?;
     let config_dir = proj_dirs.config_dir();
 
-    fs::create_dir_all(config_dir).context("Failed to create configuration directory")?;
+    fs::create_dir_all(config_dir).with_context(|| {
+        format!(
+            "Failed to create configuration directory at {}",
+            config_dir.display()
+        )
+    })?;
 
     let config_file = config_dir.join("last_prefix");
     fs::write(&config_file, path.to_string_lossy().as_bytes())
