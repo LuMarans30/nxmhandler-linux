@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use clap::{Parser, ValueEnum};
 use directories::{BaseDirs, ProjectDirs};
-use rfd::{FileDialog, MessageDialog};
+use rfd::{FileDialog, MessageButtons, MessageDialog, MessageDialogResult, MessageLevel};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -32,12 +32,12 @@ impl std::fmt::Display for WineArch {
 #[derive(Parser)]
 #[command(
     version,
-    about = "Handles Nexus Mods (nxm) requests by sending them to MO2 in a wine prefix"
+    about = "Handles Nexus Mods (NXM) requests by sending them to MO2 in a wine prefix"
 )]
 struct Cli {
     /// NXM URL
-    #[arg(short, long, required = true)]
-    nxm_url: String,
+    #[arg(short, long, required_unless_present = "create_desktop_file")]
+    nxm_url: Option<String>,
 
     /// Path to wineprefix (prompts if not provided)
     #[arg(short, long)]
@@ -50,11 +50,22 @@ struct Cli {
     /// MO2 path relative to wineprefix's drive_c
     #[arg(short, long, default_value = "Modding/MO2")]
     mo2_path: PathBuf,
+
+    /// Create a .desktop entry to register the NXM protocol
+    #[arg(short, long, exclusive = true)]
+    create_desktop_file: bool,
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    if cli.create_desktop_file {
+        return create_desktop_file();
+    }
+
+    let nxm_url = cli
+        .nxm_url
+        .context("missing required argument: --nxm-url")?;
     let wineprefix = cli.wineprefix.map_or_else(select_wineprefix, Ok)?;
 
     if let Err(e) = save_last_path(&wineprefix) {
@@ -75,13 +86,7 @@ fn main() -> Result<()> {
         nxmhandler.display()
     );
 
-    spawn_mo2(
-        &wineprefix,
-        &mo2_dir,
-        &nxmhandler,
-        &cli.nxm_url,
-        cli.winearch,
-    )?;
+    spawn_mo2(&wineprefix, &mo2_dir, &nxmhandler, &nxm_url, cli.winearch)?;
 
     Ok(())
 }
@@ -172,4 +177,62 @@ fn load_last_path() -> Result<PathBuf> {
     );
 
     Ok(path)
+}
+
+fn create_desktop_file() -> Result<()> {
+    let base_dirs = BaseDirs::new().context("Could not determine user directories")?;
+    let apps_dir = base_dirs.data_local_dir().join("applications");
+
+    fs::create_dir_all(&apps_dir).context("Failed to create applications directory")?;
+
+    let exe_path =
+        std::env::current_exe().context("Could not determine current executable path")?;
+    let desktop_file_path = apps_dir.join("nxmhandler.desktop");
+
+    let content = format!(
+        r#"[Desktop Entry]
+Type=Application
+Name=NXM Handler
+GenericName=Nexus Mod Link Handler
+Comment=Sends nxm:// links to Mod Organizer 2
+Exec={} --nxm-url %u
+Icon=1204_ModOrganizer.0
+MimeType=x-scheme-handler/nxm;
+Terminal=false
+StartupNotify=true
+"#,
+        exe_path.display()
+    );
+
+    if desktop_file_path.exists() {
+        let confirm = MessageDialog::new()
+            .set_title("Overwrite Existing Entry?")
+            .set_description(
+                "An NXM Handler desktop entry already exists. Do you want to overwrite it?",
+            )
+            .set_buttons(MessageButtons::YesNo)
+            .set_level(MessageLevel::Warning)
+            .show();
+
+        if confirm == MessageDialogResult::No {
+            println!("Installation cancelled by user.");
+            return Ok(());
+        }
+    }
+
+    fs::write(&desktop_file_path, content)?;
+
+    println!(
+        "Successfully installed desktop entry to: {}",
+        desktop_file_path.display()
+    );
+    println!("Updating desktop database...");
+
+    let update_status = Command::new("update-desktop-database")
+        .arg(apps_dir)
+        .status()?;
+
+    println!("update-desktop-database completed with {update_status}");
+
+    Ok(())
 }
