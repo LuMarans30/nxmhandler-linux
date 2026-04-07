@@ -12,6 +12,11 @@ This utility forwards Nexus Mods `nxm://` links to Mod Organizer 2 within a Wine
     ./target/release/nxmhandler --nxm-url "nxm://..."
     ```
 
+*   **Arguments:**
+    *   `-n, --nxm-url <NXM_URL>`: The NXM URL to handle (required).
+    *   `-w, --wineprefix <WINEPREFIX>`: Path to the Wine prefix. Prompts via file dialog if not set.
+    *   `-m <MO2_PATH>`: MO2 path relative to the prefix's `drive_c` directory [default: `Modding/MO2`]
+
 *   **Browser Integration: (Nexus Mods "Mod manager download")**
     
     Create a `.desktop` file (e.g., `~/.local/share/applications/nxm-handler.desktop`) with the following content. Update the `Exec` path to point to your compiled binary.

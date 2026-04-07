@@ -32,6 +32,10 @@ fn main() -> Result<()> {
         None => select_wineprefix()?,
     };
 
+    if let Err(e) = save_last_path(&wineprefix) {
+        eprintln!("Failed to save last used path: {}", e);
+    }
+
     let mo2_dir = wineprefix.join("drive_c").join(&cli.mo2_path);
     let nxmhandler = mo2_dir.join("nxmhandler.exe");
 
@@ -43,7 +47,7 @@ fn main() -> Result<()> {
         anyhow::bail!("nxmhandler.exe not found at {}", nxmhandler.display());
     }
 
-    spawn_mo2(&wineprefix, &mo2_dir, &cli.nxm_url)?;
+    spawn_mo2(&wineprefix, &mo2_dir, &nxmhandler, &cli.nxm_url)?;
 
     Ok(())
 }
@@ -52,30 +56,28 @@ fn is_wineprefix(path: &Path) -> bool {
     path.join("drive_c").is_dir() && path.join("dosdevices").is_dir()
 }
 
-fn spawn_mo2(wineprefix: &Path, mo2_dir: &Path, nxm_url: &str) -> Result<()> {
-    let cmd = Command::new("wine")
+fn spawn_mo2(wineprefix: &Path, mo2_dir: &Path, nxmhandler: &Path, nxm_url: &str) -> Result<()> {
+    let mut cmd = Command::new("wine")
         .env("WINEARCH", "win64")
         .env("WINEPREFIX", wineprefix)
         .current_dir(mo2_dir)
-        .arg("nxmhandler.exe")
+        .arg(nxmhandler)
         .arg(nxm_url)
         .spawn()
         .context("Failed to launch wine")?;
 
-    let output = cmd.wait_with_output()?;
-    println!("wine output: {:?}", output);
+    let status = cmd.wait()?;
+    println!("Exit status: {:?}", status.code());
 
     Ok(())
 }
 
 fn select_wineprefix() -> Result<PathBuf> {
-    let initial_dir = match load_last_path() {
-        Some(p) => p,
-        None => {
-            let home = std::env::var("HOME").context("HOME environment variable not set")?;
-            PathBuf::from(format!("{}/.wine", home))
-        }
-    };
+    let initial_dir = load_last_path().unwrap_or_else(|_| {
+        get_home_path()
+            .map(|p| p.join(".wine"))
+            .expect("HOME not set")
+    });
 
     loop {
         let folder = FileDialog::new().set_directory(&initial_dir).pick_folder();
@@ -83,9 +85,6 @@ fn select_wineprefix() -> Result<PathBuf> {
         match folder {
             Some(path) => {
                 if is_wineprefix(&path) {
-                    if let Err(e) = save_last_path(&path) {
-                        eprintln!("Failed to save last used path: {}", e);
-                    }
                     return Ok(path);
                 }
 
@@ -102,31 +101,35 @@ fn select_wineprefix() -> Result<PathBuf> {
     }
 }
 
-fn get_config_path() -> Option<PathBuf> {
-    std::env::var("HOME")
-        .ok()
-        .map(|h| PathBuf::from(h).join("$HOME/.config/nxm-handler/last_prefix"))
+fn get_config_path() -> Result<PathBuf> {
+    get_home_path().map(|p| p.join(".config/nxm-handler/last_prefix"))
 }
 
 fn save_last_path(path: &Path) -> Result<()> {
-    if let Some(config_path) = get_config_path() {
-        if let Some(parent) = config_path.parent() {
-            fs::create_dir_all(parent).context("Failed to create config directory")?;
-        }
-        fs::write(&config_path, path.to_string_lossy().as_bytes())
-            .context("Failed to write config file")?;
+    let config_path = get_config_path()?;
+    if let Some(parent) = config_path.parent() {
+        fs::create_dir_all(parent).context("Failed to create config directory")?;
     }
+    fs::write(&config_path, path.to_string_lossy().as_bytes())
+        .context("Failed to write config file")?;
     Ok(())
 }
 
-fn load_last_path() -> Option<PathBuf> {
+fn load_last_path() -> Result<PathBuf> {
     let config_path = get_config_path()?;
     if config_path.exists() {
-        let content = fs::read_to_string(config_path).ok()?;
+        let content = fs::read_to_string(config_path)?;
         let path = PathBuf::from(content.trim());
         if path.is_dir() {
-            return Some(path);
+            return Ok(path);
         }
     }
-    None
+
+    Err(anyhow::anyhow!("Could not find last_path"))
+}
+
+fn get_home_path() -> Result<PathBuf> {
+    std::env::var("HOME")
+        .context("HOME environment variable not set")
+        .map(PathBuf::from)
 }
